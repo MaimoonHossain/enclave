@@ -5,6 +5,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
 
 // 1. Initialize the Pinecone Client
+// maimoon
 export const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
