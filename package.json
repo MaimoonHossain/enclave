@@ -9,7 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.42",
+    "@langchain/google-genai": "^2.1.29",
+    "@langchain/pinecone": "^1.0.2",
+    "@langchain/textsplitters": "^1.0.1",
+    "@pinecone-database/pinecone": "^5.1.2",
     "next": "16.2.4",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
