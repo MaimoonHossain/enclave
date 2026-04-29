@@ -25,8 +25,7 @@ export async function POST(request: Request) {
 
     // 4. Initialize Gemini (UPDATED CONFIGURATION)
     const llm = new ChatGoogleGenerativeAI({
-      model: 'gemini-3-flash-preview',     // <-- ADDED: The new standard property
-      modelName: 'gemini-3-flash-preview',   // <-- KEPT: For LangChain backward compatibility
+      model: 'gemini-3-flash-preview',
       temperature: 0.2, 
       apiKey: process.env.GOOGLE_API_KEY!,
     });
