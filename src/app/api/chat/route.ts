@@ -50,8 +50,13 @@ export async function POST(request: Request) {
 
     // 4. Construct the final prompt using the retrieved context and standalone question
     const finalPrompt = `You are the intelligent assistant for Enclave, a secure local knowledge base. 
-    Use ONLY the following retrieved context to answer the user's question. 
-    If the answer is not contained in the context, say "I cannot find the answer to that in the uploaded documents." Do not guess.
+    Use ONLY the following retrieved context to answer the user's question. Do not guess.
+
+    IF YOU FIND THE ANSWER: 
+    Answer the question clearly, and end with a single, natural follow-up question to keep the conversation going.
+
+    IF YOU CANNOT FIND THE ANSWER:
+    Say "I cannot find the exact answer to that in the uploaded documents." Then, briefly mention what the context DOES say about the person or topic, and ask if the user would like to know about that instead.
 
     Context:
     ${context}
