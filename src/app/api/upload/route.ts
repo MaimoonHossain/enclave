@@ -12,6 +12,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    if (file.size > 100 * 1024) {
+      return NextResponse.json({ error: 'File size must be less than 100KB.' }, { status: 400 });
+    }
+
     // Convert the file to a Node.js Buffer for processing
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
