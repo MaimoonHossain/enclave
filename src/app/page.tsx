@@ -79,12 +79,19 @@ export default function Home() {
     setIsTyping(true);
 
     try {
+     // Grab the last 4 messages to give context without wasting tokens
+      const recentHistory = chatHistory.slice(-4);
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
+        // Added the history payload here
+        body: JSON.stringify({ 
+          message: userMessage,
+          history: recentHistory 
+        }),
       });
-
+      
       const data = await response.json();
 
       if (response.ok) {
