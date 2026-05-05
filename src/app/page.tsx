@@ -36,11 +36,11 @@ export default function Home() {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      if (selectedFile.size > 100 * 1024) {
-        setUploadMessage('Error: File size must be less than 100KB.');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
-      }
+      // if (selectedFile.size > 100 * 1024) {
+      //   setUploadMessage('Error: File size must be less than 100KB.');
+      //   if (fileInputRef.current) fileInputRef.current.value = '';
+      //   return;
+      // }
 
       setFile(selectedFile);
       setUploadMessage('');
