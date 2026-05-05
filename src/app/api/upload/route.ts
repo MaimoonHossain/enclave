@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { processAndEmbed } from '@/lib/rag'; 
-import { PDFParse } from 'pdf-parse';
+import { WebPDFLoader } from "@langchain/community/document_loaders/web/pdf";
 
 export async function POST(request: Request) {
   try {
@@ -23,10 +23,13 @@ export async function POST(request: Request) {
 
     // 2. Parse the text based on file type
     if (file.type === 'application/pdf') {
-      const parser = new PDFParse({ data: buffer });
-      const pdfData = await parser.getText();
-      extractedText = pdfData.text;
-      await parser.destroy();
+      const loader = new WebPDFLoader(file);
+      const docs = await loader.load();
+      extractedText = docs.map((doc: any) => doc.pageContent).join("\n");
+      // const parser = new PDFParse({ data: buffer });
+      // const pdfData = await parser.getText();
+      // extractedText = pdfData.text;
+      // await parser.destroy();
     } else if (file.type === 'text/plain') {
       extractedText = buffer.toString('utf-8');
     } else {

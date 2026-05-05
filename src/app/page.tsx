@@ -58,8 +58,9 @@ export default function Home() {
         } else {
           setUploadMessage(`Error: ${data.error}`);
         }
-      } catch {
+      } catch (error) {
         setUploadMessage('An unexpected error occurred.');
+        console.log("error: ", error)
       } finally {
         setIsUploading(false);
         setFile(null);
