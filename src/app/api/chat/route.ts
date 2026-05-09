@@ -1,81 +1,124 @@
-import { NextResponse } from 'next/server';
+import { streamText, generateText, CoreMessage } from 'ai';
+import { google } from '@ai-sdk/google';
 import { pinecone, embeddings } from '@/lib/rag';
 import { PineconeStore } from '@langchain/pinecone';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   try {
-    // 1. Now we extract BOTH the new message and the previous chat history
-    const body = await request.json();
-    const { message, history } = body;
+    // =========================
+    // Parse Messages
+    // =========================
+    const { messages } = await request.json();
 
-    if (!message) {
-      return NextResponse.json({ error: 'Message is required' }, { status: 400 });
-    }
+    // Transform incoming UI messages to AI SDK CoreMessages
+    const coreMessages: CoreMessage[] = messages.map((m: any) => ({
+      role: m.role,
+      content: m.parts 
+        ? m.parts.map((p: any) => (p.type === 'text' ? p.text : '')).join('') 
+        : (m.content || ''),
+    }));
 
-    const llm = new ChatGoogleGenerativeAI({
-      model: 'gemini-3-flash-preview',
-      temperature: 0.2,
-      apiKey: process.env.GOOGLE_API_KEY!,
-    });
+    // Latest user message
+    const latestMessage = coreMessages[coreMessages.length - 1]?.content as string || '';
 
-    // 2. The Rephraser Step: Contextualize the question if there is a history
-    let standaloneQuestion = message;
-    
-    if (history && history.length > 0) {
-      const historyText = history.map((m: any) => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n');
-      
-      const rephrasePrompt = `Given the following conversation history and the user's latest question, rephrase the user's question to be a standalone question that can be understood without the history. Do NOT answer the question, just rephrase it.
-      
+    // Previous history
+    const history = coreMessages.slice(0, -1);
+
+    // =========================
+    // Rephrase Question
+    // =========================
+    let standaloneQuestion = latestMessage;
+
+    if (history.length > 0) {
+      const historyText = history
+        .map((m) => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`)
+        .join('\n');
+
+      const rephrasePrompt = `
+      Given the following conversation history and the user's latest question,
+      rephrase the user's question into a standalone question.
+
+      Do NOT answer the question.
+
       Chat History:
       ${historyText}
-      
-      Latest Question: ${message}
-      
-      Standalone Question:`;
-      
-      const rephraseResponse = await llm.invoke(rephrasePrompt);
-      standaloneQuestion = rephraseResponse.content;
-      console.log("Original Q:", message, "| Standalone Q:", standaloneQuestion); // For your terminal to see the magic
+
+      Latest Question:
+      ${latestMessage}
+
+      Standalone Question:
+      `;
+
+      const { text } = await generateText({
+        model: google('gemini-3-flash-preview'),
+        prompt: rephrasePrompt,
+      });
+
+      standaloneQuestion = text;
+
+      console.log('Original:', latestMessage);
+      console.log('Standalone:', standaloneQuestion);
     }
 
-    // 3. Connect to Pinecone and Search using the STANDALONE question
+    // =========================
+    // Pinecone Search
+    // =========================
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!);
+
     const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
       pineconeIndex: index,
     });
 
     const searchResults = await vectorStore.similaritySearch(standaloneQuestion, 3);
-    const context = searchResults.map(doc => doc.pageContent).join('\n\n---\n\n');
+    const context = searchResults.map((doc) => doc.pageContent).join('\n\n---\n\n');
 
-    // 4. Construct the final prompt using the retrieved context and standalone question
-    const finalPrompt = `You are the intelligent assistant for Enclave, a secure local knowledge base. 
-    Use ONLY the following retrieved context to answer the user's question. Do not guess.
+    // Unique Sources
+    const sources = [...new Set(searchResults.map((doc) => doc.metadata.source))];
 
-    IF YOU FIND THE ANSWER: 
-    Answer the question clearly, and end with a single, natural follow-up question to keep the conversation going.
+    // =========================
+    // System Prompt
+    // =========================
+    const systemPrompt = `
+You are the intelligent assistant for Enclave,
+a secure local knowledge base.
 
-    IF YOU CANNOT FIND THE ANSWER:
-    Say "I cannot find the exact answer to that in the uploaded documents." Then, briefly mention what the context DOES say about the person or topic, and ask if the user would like to know about that instead.
+Use ONLY the retrieved context below.
 
-    Context:
-    ${context}
+If the answer exists:
+- Answer clearly
+- End with a natural follow-up question
 
-    Question:
-    ${standaloneQuestion}
+If the answer does NOT exist:
+- Say:
+"I cannot find the exact answer to that in the uploaded documents."
+- Briefly mention related context
+- Ask if the user wants that instead
 
-    Answer:`;
+Context:
+${context}
+`;
 
-    // 5. Send to Gemini for the final answer
-    const response = await llm.invoke(finalPrompt);
-
-    return NextResponse.json({ 
-      answer: response.content,
-      sources: searchResults.map(doc => doc.metadata.source)
+    // =========================
+    // Stream Response
+    // =========================
+    const result = streamText({
+      model: google('gemini-3-flash-preview'),
+      system: systemPrompt,
+      messages: coreMessages, // <-- FIX: Passing the mapped CoreMessages instead of raw frontend messages
     });
 
+    // =========================
+    // Return Stream
+    // =========================
+    return result.toUIMessageStreamResponse({
+      headers: {
+        'X-Enclave-Sources': JSON.stringify(sources),
+      },
+    });
   } catch (error: any) {
     console.error('Chat Error:', error.message || error);
-    return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
+    return new Response('Failed to generate response', { status: 500 });
   }
 }

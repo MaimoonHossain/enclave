@@ -1,147 +1,234 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
+
 import { Message, VaultFile } from '@/types/chat';
 
 export function useEnclave() {
-  // Upload & Vault State
+  // =========================
+  // Input State
+  // =========================
+  const [query, setQuery] = useState('');
+
+  // =========================
+  // Vault State
+  // =========================
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
+
   const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
   const [showVault, setShowVault] = useState(false);
+
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
-  
-  // Chat State
-  const [query, setQuery] = useState('');
-  const [chatHistory, setChatHistory] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  
+
+  // =========================
+  // Refs & Source Mapping
+  // =========================
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Track sources per message ID to preserve them in history
+  const [sourcesMap, setSourcesMap] = useState<Record<string, string[]>>({});
+  const latestSourcesRef = useRef<string[] | null>(null);
 
-  // Auto-scroll
+  // =========================
+  // AI SDK Chat
+  // =========================
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+  } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+    }),
+    
+    // Extract the custom header when the stream first connects
+    onResponse: (response) => {
+      const sourcesHeader = response.headers.get('X-Enclave-Sources');
+      if (sourcesHeader) {
+        try {
+          latestSourcesRef.current = JSON.parse(sourcesHeader);
+        } catch (e) {
+          console.error('Failed to parse sources header:', e);
+        }
+      }
+    },
+    
+    // Lock the sources to the specific message ID when generation finishes
+    onFinish: (message) => {
+      if (latestSourcesRef.current) {
+        setSourcesMap((prev) => ({
+          ...prev,
+          [message.id]: latestSourcesRef.current!,
+        }));
+        latestSourcesRef.current = null;
+      }
+    },
+
+    onError: (error) => {
+      console.error('Chat stream error:', error);
+    },
+  });
+
+  // =========================
+  // Loading State
+  // =========================
+  const isTyping = status === 'submitted' || status === 'streaming';
+
+  // =========================
+  // Auto Scroll
+  // =========================
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isTyping]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth',
+    });
+  }, [messages, isTyping]);
 
-  // Load vault files from local storage on mount
+  // =========================
+  // Load Vault Files
+  // =========================
   useEffect(() => {
     const savedFiles = localStorage.getItem('enclave_vault');
+
     if (savedFiles) {
       try {
         setVaultFiles(JSON.parse(savedFiles));
-      } catch (e) {
-        console.error("Failed to parse vault files");
+      } catch (error) {
+        console.error('Failed to parse vault files:', error);
       }
     }
   }, []);
 
-  // --- Upload Logic ---
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      
-      setFile(selectedFile);
-      setUploadMessage('');
-      
-      setIsUploading(true);
-      const formData = new FormData();
-      formData.append('file', selectedFile);
+  // =========================
+  // Convert SDK Messages
+  // =========================
+  const chatHistory: Message[] = messages.map((message, index) => {
+    const isLastMessage = index === messages.length - 1;
+    let activeSources = sourcesMap[message.id];
 
-      try {
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
-        const data = await response.json();
-        
-        if (response.ok) {
-          setUploadMessage(`Vault Updated: Processed ${selectedFile.name}`);
-          
-          const newFile = { name: selectedFile.name, date: Date.now() };
-          const updatedVault = [newFile, ...vaultFiles.filter(f => f.name !== selectedFile.name)];
-          setVaultFiles(updatedVault);
-          localStorage.setItem('enclave_vault', JSON.stringify(updatedVault));
-          
-        } else {
-          setUploadMessage(`Error: ${data.error}`);
-        }
-      } catch (error) {
-        setUploadMessage('An unexpected error occurred.');
-        console.error("Upload error: ", error);
-      } finally {
-        setIsUploading(false);
-        setFile(null);
-        setTimeout(() => setShowUploadMenu(false), 2000);
+    // If it's currently streaming, use the ref to show badges immediately
+    if (!activeSources && isLastMessage && message.role !== 'user') {
+      activeSources = latestSourcesRef.current || undefined;
+    }
+
+    return {
+      id: message.id,
+      role: message.role === 'user' ? 'user' : 'ai',
+      content: message.parts?.map((part) => (part.type === 'text' ? part.text : '')).join('') || '',
+      sources: activeSources,
+    };
+  });
+
+  // =========================
+  // Upload File
+  // =========================
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) {
+      return;
+    }
+
+    const selectedFile = e.target.files[0];
+
+    setFile(selectedFile);
+    setUploadMessage('');
+    setIsUploading(true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUploadMessage(`Vault Updated: Processed ${selectedFile.name}`);
+
+        const newFile: VaultFile = {
+          name: selectedFile.name,
+          date: Date.now(),
+        };
+
+        const updatedVault = [
+          newFile,
+          ...vaultFiles.filter((f) => f.name !== selectedFile.name),
+        ];
+
+        setVaultFiles(updatedVault);
+        localStorage.setItem('enclave_vault', JSON.stringify(updatedVault));
+      } else {
+        setUploadMessage(`Error: ${data.error}`);
       }
+    } catch (error) {
+      console.error(error);
+      setUploadMessage('An unexpected error occurred.');
+    } finally {
+      setIsUploading(false);
+      setFile(null);
+
+      setTimeout(() => {
+        setShowUploadMenu(false);
+      }, 2000);
     }
   };
 
-  // --- Delete Logic ---
+  // =========================
+  // Delete File
+  // =========================
   const handleDeleteFile = async (filename: string) => {
     setDeletingFile(filename);
+
     try {
       const response = await fetch('/api/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename })
+        body: JSON.stringify({ filename }),
       });
 
       if (response.ok) {
-        const updatedVault = vaultFiles.filter(f => f.name !== filename);
+        const updatedVault = vaultFiles.filter((f) => f.name !== filename);
         setVaultFiles(updatedVault);
         localStorage.setItem('enclave_vault', JSON.stringify(updatedVault));
-      } else {
-        const data = await response.json();
-        alert(`Failed to delete file: ${data.error}`);
       }
     } catch (error) {
-      console.error("Delete error:", error);
-      alert("Network error while deleting.");
+      console.error(error);
+      alert('Network error while deleting.');
     } finally {
       setDeletingFile(null);
     }
   };
 
-  // --- Chat Logic ---
+  // =========================
+  // Send Chat Message
+  // =========================
   const handleChat = async (e: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!query.trim() || isTyping) return;
+    e.preventDefault();
+
+    if (!query.trim() || isTyping) {
+      return;
+    }
 
     const userMessage = query.trim();
+
+    // Clear UI instantly
     setQuery('');
-    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMessage }]);
-    setIsTyping(true);
 
-    try {
-      const recentHistory = chatHistory.slice(-4);
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: userMessage,
-          history: recentHistory 
-        }),
-      });
-      
-      const data = await response.json();
-
-      if (response.ok) {
-        setChatHistory(prev => [...prev, { 
-          id: (Date.now() + 1).toString(), 
-          role: 'ai', 
-          content: data.answer,
-          sources: data.sources && data.sources.length > 0 ? [...new Set(data.sources as string[])] : undefined 
-        }]);
-      } else {
-        setChatHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: `Error: ${data.error}` }]);
-      }
-    } catch (error) {
-      console.error("Chat error:", error);
-      setChatHistory(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'ai', content: 'Connection error. Please try again.' }]);
-    } finally {
-      setIsTyping(false);
-    }
+    // Send message using the v6 format
+    sendMessage({
+      text: userMessage,
+    });
   };
 
+  // =========================
+  // Enter to Send
+  // =========================
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -149,12 +236,15 @@ export function useEnclave() {
     }
   };
 
+  // =========================
+  // Return
+  // =========================
   return {
-    // State
     query,
     setQuery,
     chatHistory,
     isTyping,
+    error,
     vaultFiles,
     showVault,
     setShowVault,
@@ -163,12 +253,8 @@ export function useEnclave() {
     isUploading,
     uploadMessage,
     deletingFile,
-    
-    // Refs
     messagesEndRef,
     fileInputRef,
-    
-    // Handlers
     handleChat,
     handleKeyDown,
     handleFileChange,
