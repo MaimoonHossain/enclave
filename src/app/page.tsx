@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { Plus, Send, FileText, Cpu, User, Loader2, ArrowUp, X } from 'lucide-react';
+import { Plus, Send, FileText, Cpu, User, Loader2, ArrowUp, X, Trash2, Archive } from 'lucide-react';
 
 type Message = {
   id: string;
@@ -12,12 +12,20 @@ type Message = {
   sources?: string[];
 };
 
+type VaultFile = {
+  name: string;
+  date: number;
+};
+
 export default function Home() {
-  // Upload State
+  // Upload & Vault State
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
+  const [vaultFiles, setVaultFiles] = useState<VaultFile[]>([]);
+  const [showVault, setShowVault] = useState(false);
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
   
   // Chat State
   const [query, setQuery] = useState('');
@@ -31,17 +39,23 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
 
+  // Load vault files from local storage on mount
+  useEffect(() => {
+    const savedFiles = localStorage.getItem('enclave_vault');
+    if (savedFiles) {
+      try {
+        setVaultFiles(JSON.parse(savedFiles));
+      } catch (e) {
+        console.error("Failed to parse vault files");
+      }
+    }
+  }, []);
+
   // --- Upload Logic ---
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       
-      // if (selectedFile.size > 100 * 1024) {
-      //   setUploadMessage('Error: File size must be less than 100KB.');
-      //   if (fileInputRef.current) fileInputRef.current.value = '';
-      //   return;
-      // }
-
       setFile(selectedFile);
       setUploadMessage('');
       
@@ -53,8 +67,17 @@ export default function Home() {
       try {
         const response = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await response.json();
+        
         if (response.ok) {
           setUploadMessage(`Vault Updated: Processed ${selectedFile.name}`);
+          
+          // Add to local state & local storage
+          const newFile = { name: selectedFile.name, date: Date.now() };
+          // Remove duplicates if re-uploading the same file, then add new
+          const updatedVault = [newFile, ...vaultFiles.filter(f => f.name !== selectedFile.name)];
+          setVaultFiles(updatedVault);
+          localStorage.setItem('enclave_vault', JSON.stringify(updatedVault));
+          
         } else {
           setUploadMessage(`Error: ${data.error}`);
         }
@@ -66,6 +89,32 @@ export default function Home() {
         setFile(null);
         setTimeout(() => setShowUploadMenu(false), 2000);
       }
+    }
+  };
+
+  // --- Delete Logic ---
+  const handleDeleteFile = async (filename: string) => {
+    setDeletingFile(filename);
+    try {
+      const response = await fetch('/api/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+
+      if (response.ok) {
+        const updatedVault = vaultFiles.filter(f => f.name !== filename);
+        setVaultFiles(updatedVault);
+        localStorage.setItem('enclave_vault', JSON.stringify(updatedVault));
+      } else {
+        const data = await response.json();
+        alert(`Failed to delete file: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Network error while deleting.");
+    } finally {
+      setDeletingFile(null);
     }
   };
 
@@ -130,9 +179,15 @@ export default function Home() {
           </div>
           <h1 className="text-base font-semibold tracking-tight text-neutral-100">Enclave</h1>
         </div>
-        <div className="px-3 py-1 text-xs font-medium border rounded-full bg-neutral-900 border-white/10 text-neutral-400">
-          Secure Vault
-        </div>
+        
+        {/* Clickable Vault Badge */}
+        <button 
+          onClick={() => setShowVault(true)}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border rounded-full bg-neutral-900 border-white/10 text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+        >
+          <Archive className="w-3 h-3" />
+          <span>Vault ({vaultFiles.length})</span>
+        </button>
       </header>
 
       {/* Main Chat Area */}
@@ -316,6 +371,70 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* --- Vault Modal Overlay --- */}
+      <AnimatePresence>
+        {showVault && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md bg-[#09090b] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-white/10 bg-neutral-900/50">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Your Vault</h2>
+                  <p className="text-xs text-neutral-400">Manage your active knowledge base files.</p>
+                </div>
+                <button onClick={() => setShowVault(false)} className="p-2 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                {vaultFiles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Archive className="w-10 h-10 text-neutral-700 mx-auto mb-3" />
+                    <p className="text-sm text-neutral-500">Your vault is currently empty.</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {vaultFiles.map((f, i) => (
+                      <li key={i} className="flex items-center justify-between p-3 rounded-xl bg-neutral-900 border border-white/5 group">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-5 h-5 text-neutral-400" />
+                          </div>
+                          <div className="flex flex-col truncate">
+                            <span className="text-sm font-medium text-neutral-200 truncate">{f.name}</span>
+                            <span className="text-xs text-neutral-500">
+                              Uploaded {new Date(f.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => handleDeleteFile(f.name)}
+                          disabled={deletingFile === f.name}
+                          className="flex-shrink-0 p-2 text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          {deletingFile === f.name ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
