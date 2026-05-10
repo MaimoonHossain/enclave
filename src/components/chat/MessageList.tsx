@@ -57,7 +57,15 @@ export function MessageList({
                     }`}
                   >
                     {msg.role === 'ai' ? (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      msg.content.trim() ? (
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      ) : (
+                        <div className="flex items-center gap-1 py-1">
+                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} />
+                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
+                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
+                        </div>
+                      )
                     ) : (
                       msg.content
                     )}
@@ -77,7 +85,7 @@ export function MessageList({
               </motion.div>
             ))}
 
-            {isTyping && (
+            {isTyping && chatHistory[chatHistory.length - 1]?.role !== 'ai' && (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
