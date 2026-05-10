@@ -44,22 +44,23 @@ export function useEnclave() {
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/chat',
+      // Extract the custom header when the stream first connects
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        const sourcesHeader = response.headers.get('X-Enclave-Sources');
+        if (sourcesHeader) {
+          try {
+            latestSourcesRef.current = JSON.parse(sourcesHeader);
+          } catch (e) {
+            console.error('Failed to parse sources header:', e);
+          }
+        }
+        return response;
+      },
     }),
     
-    // Extract the custom header when the stream first connects
-    onResponse: (response) => {
-      const sourcesHeader = response.headers.get('X-Enclave-Sources');
-      if (sourcesHeader) {
-        try {
-          latestSourcesRef.current = JSON.parse(sourcesHeader);
-        } catch (e) {
-          console.error('Failed to parse sources header:', e);
-        }
-      }
-    },
-    
     // Lock the sources to the specific message ID when generation finishes
-    onFinish: (message) => {
+    onFinish: (message: any) => {
       if (latestSourcesRef.current) {
         setSourcesMap((prev) => ({
           ...prev,
@@ -112,7 +113,7 @@ export function useEnclave() {
 
     // If it's currently streaming, use the ref to show badges immediately
     if (!activeSources && isLastMessage && message.role !== 'user') {
-      activeSources = latestSourcesRef.current || undefined;
+      activeSources = latestSourcesRef.current || undefined as any;
     }
 
     return {
