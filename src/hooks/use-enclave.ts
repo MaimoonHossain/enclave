@@ -107,22 +107,39 @@ export function useEnclave() {
   // =========================
   // Convert SDK Messages
   // =========================
-  const chatHistory: Message[] = messages.map((message, index) => {
-    const isLastMessage = index === messages.length - 1;
-    let activeSources = sourcesMap[message.id];
+// =========================
+// Convert SDK Messages
+// =========================
+const chatHistory: Message[] = messages.map((message, index) => {
+  const isLastMessage = index === messages.length - 1;
+  let activeSources: string[] | undefined = sourcesMap[message.id];
 
-    // If it's currently streaming, use the ref to show badges immediately
-    if (!activeSources && isLastMessage && message.role !== 'user') {
-      activeSources = latestSourcesRef.current || undefined as any;
-    }
+  if (!activeSources && isLastMessage && message.role !== 'user') {
+    activeSources = latestSourcesRef.current || undefined;
+  }
 
-    return {
-      id: message.id,
-      role: message.role === 'user' ? 'user' : 'ai',
-      content: message.parts?.map((part) => (part.type === 'text' ? part.text : '')).join('') || '',
-      sources: activeSources,
-    };
-  });
+  // Extract Tool Invocations from message parts (AI SDK v6 pattern)
+  // We use a combination of message.toolInvocations (v4/v5 compat) and parts (v6)
+  const toolCalls = [
+    ...(message.toolInvocations || []),
+    ...(message.parts
+      ?.filter((part: any) => part.type === 'tool-invocation')
+      .map((part: any) => part.toolInvocation) || [])
+  ];
+
+  // Deduplicate by toolCallId
+  const uniqueToolCalls = Array.from(
+    new Map(toolCalls.map(tc => [tc.toolCallId, tc])).values()
+  );
+
+  return {
+    id: message.id,
+    role: message.role === 'user' ? 'user' : 'ai',
+    content: message.parts?.map((part: any) => (part.type === 'text' ? part.text : '')).join('') || '',
+    sources: activeSources,
+    toolInvocations: uniqueToolCalls
+  };
+});
 
   // =========================
   // Upload File

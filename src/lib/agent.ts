@@ -33,8 +33,24 @@ const vaultSearchTool = tool(
 );
 
 // Tool B: The Live Web (DuckDuckGo)
-// This is a free, no-API-key-required web search tool natively built into LangChain
-const webSearchTool = new DuckDuckGoSearch({ maxResults: 3 });
+const webSearchTool = tool(
+  async ({ query }) => {
+    try {
+      const search = new DuckDuckGoSearch({ maxResults: 3 });
+      return await search.invoke(query);
+    } catch (error: any) {
+      console.error("Web Search Error:", error);
+      return `Search failed: ${error.message || "Unknown error"}`;
+    }
+  },
+  {
+    name: "duckduckgo_search",
+    description: "Search the live web for external or current information.",
+    schema: z.object({ 
+      query: z.string().describe("The search query to look up on the web") 
+    }),
+  }
+);
 
 const tools = [vaultSearchTool, webSearchTool];
 const toolNode = new ToolNode(tools);

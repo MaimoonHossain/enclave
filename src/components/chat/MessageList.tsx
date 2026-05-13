@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { Cpu, FileText } from 'lucide-react';
+import { Cpu, FileText, Globe, Database, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { RefObject } from 'react';
 
@@ -49,6 +49,53 @@ export function MessageList({
                 )}
 
                 <div className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                  {/* Tool Invocations (Searching Badges) */}
+                  {msg.role === 'ai' && msg.toolInvocations && msg.toolInvocations.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {msg.toolInvocations.map((toolInv: any) => {
+                        const { toolName, state, toolCallId } = toolInv;
+                        const isDone = state === 'result';
+                        // Case-insensitive check for reliability
+                        const isVault = toolName.toLowerCase() === 'vault_search';
+                        const isWeb = toolName.toLowerCase().includes('search') && !isVault;
+                        
+                        return (
+                          <motion.div 
+                            key={toolCallId}
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-500 ${
+                              isDone 
+                                ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500/80' 
+                                : 'bg-blue-500/5 border-blue-500/10 text-blue-400 animate-pulse'
+                            }`}
+                          >
+                            {isVault ? (
+                              <Database className="w-3.5 h-3.5" />
+                            ) : isWeb ? (
+                              <Globe className="w-3.5 h-3.5" />
+                            ) : (
+                              <Cpu className="w-3.5 h-3.5" />
+                            )}
+                            <span className="tracking-tight">
+                              {isVault ? 'Searching Vault' : isWeb ? 'Searching Web' : `Running ${toolName}`}
+                              {!isDone && <span className="ml-0.5">...</span>}
+                            </span>
+                            {isDone && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500/20"
+                              >
+                                <Check className="w-2.5 h-2.5" />
+                              </motion.div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div 
                     className={`px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
                       msg.role === 'user' 
@@ -60,11 +107,14 @@ export function MessageList({
                       msg.content.trim() ? (
                         <ReactMarkdown>{msg.content}</ReactMarkdown>
                       ) : (
-                        <div className="flex items-center gap-1 py-1">
-                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} />
-                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
-                          <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
-                        </div>
+                        // Show typing dots ONLY if no tools are running
+                        (!msg.toolInvocations || msg.toolInvocations.length === 0) && (
+                          <div className="flex items-center gap-1 py-1">
+                            <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }} />
+                            <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
+                            <motion.div className="w-1.5 h-1.5 rounded-full bg-neutral-500" animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
+                          </div>
+                        )
                       )
                     ) : (
                       msg.content

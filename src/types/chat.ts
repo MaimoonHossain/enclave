@@ -3,6 +3,7 @@ export type Message = {
   role: 'user' | 'ai';
   content: string;
   sources?: string[];
+  toolInvocations?: any[];
 };
 
 export type VaultFile = {
