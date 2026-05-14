@@ -2,7 +2,7 @@ import { createUIMessageStreamResponse } from 'ai';
 import { toUIMessageStream } from '@ai-sdk/langchain';
 import { enclaveAgent } from '@/lib/agent';
 
-export const maxDuration = 30;
+export const maxDuration = 60; // Increased for Local LLM stability
 
 export async function POST(request: Request) {
   try {
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     // 3. Kick off the autonomous Agent workflow
     const eventStream = await enclaveAgent.streamEvents(
       { messages: mappedMessages },
-      { version: 'v2' }
+      { version: 'v2', signal: request.signal }
     );
 
     // 4. Adapt the LangGraph event stream into a Vercel v6 UI Message Stream!

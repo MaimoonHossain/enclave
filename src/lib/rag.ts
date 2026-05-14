@@ -1,5 +1,5 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
+import { createEmbeddings } from './ai/embeddings';
 import { PineconeStore } from '@langchain/pinecone';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
@@ -7,10 +7,7 @@ export const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!,
 });
 
-export const embeddings = new GoogleGenerativeAIEmbeddings({
-  apiKey: process.env.GOOGLE_API_KEY!,
-  modelName: 'gemini-embedding-001',
-});
+export const embeddings = createEmbeddings();
 
 export async function processAndEmbed(text: string, sourceName: string) {
   const cleanText = text.replace(/\s+/g, ' ').trim();
@@ -31,6 +28,7 @@ export async function processAndEmbed(text: string, sourceName: string) {
 
   await PineconeStore.fromDocuments(docs, embeddings, {
     pineconeIndex: index,
+    namespace: process.env.PINECONE_NAMESPACE || "",
   });
 
   return docs.length; 

@@ -25,6 +25,7 @@ export default function Home() {
     handleKeyDown,
     handleFileChange,
     handleDeleteFile,
+    stop,
   } = useEnclave();
 
   return (
@@ -55,6 +56,7 @@ export default function Home() {
         uploadMessage={uploadMessage}
         fileInputRef={fileInputRef}
         handleFileChange={handleFileChange}
+        stop={stop}
       />
     </div>
   );

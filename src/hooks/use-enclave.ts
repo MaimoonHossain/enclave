@@ -41,6 +41,7 @@ export function useEnclave() {
     sendMessage,
     status,
     error,
+    stop,
   } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/chat',
@@ -277,5 +278,6 @@ const chatHistory: Message[] = messages.map((message, index) => {
     handleKeyDown,
     handleFileChange,
     handleDeleteFile,
+    stop,
   };
 }

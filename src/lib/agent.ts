@@ -1,12 +1,11 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { createLLM } from "./ai/llm";
 import { StateGraph, MessagesAnnotation } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { pinecone, embeddings } from "./rag";
 import { PineconeStore } from "@langchain/pinecone";
-import { DuckDuckGoSearch } from "@langchain/community/tools/duckduckgo_search";
-
+import { TavilySearch } from "@langchain/tavily";
 // =========================
 // 1. Define Tools
 // =========================
@@ -15,7 +14,10 @@ import { DuckDuckGoSearch } from "@langchain/community/tools/duckduckgo_search";
 const vaultSearchTool = tool(
   async ({ query }) => {
     const index = pinecone.Index(process.env.PINECONE_INDEX_NAME!);
-    const vectorStore = await PineconeStore.fromExistingIndex(embeddings, { pineconeIndex: index });
+    const vectorStore = await PineconeStore.fromExistingIndex(embeddings, { 
+      pineconeIndex: index,
+      namespace: process.env.PINECONE_NAMESPACE || "",
+    });
     const results = await vectorStore.similaritySearch(query, 3);
     
     if (results.length === 0) {
@@ -32,25 +34,11 @@ const vaultSearchTool = tool(
   }
 );
 
-// Tool B: The Live Web (DuckDuckGo)
-const webSearchTool = tool(
-  async ({ query }) => {
-    try {
-      const search = new DuckDuckGoSearch({ maxResults: 3 });
-      return await search.invoke(query);
-    } catch (error: any) {
-      console.error("Web Search Error:", error);
-      return `Search failed: ${error.message || "Unknown error"}`;
-    }
-  },
-  {
-    name: "duckduckgo_search",
-    description: "Search the live web for external or current information.",
-    schema: z.object({ 
-      query: z.string().describe("The search query to look up on the web") 
-    }),
-  }
-);
+// Tool B: The Live Web (Tavily)
+const webSearchTool = new TavilySearch({
+  maxResults: 3,
+  tavilyApiKey: process.env.TAVILY_API_KEY,
+});
 
 const tools = [vaultSearchTool, webSearchTool];
 const toolNode = new ToolNode(tools);
@@ -58,10 +46,7 @@ const toolNode = new ToolNode(tools);
 // =========================
 // 2. Define the Agent Model
 // =========================
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-3-flash-preview",
-  temperature: 0.1, // Low temperature keeps the agent strictly logical when choosing tools
-}).bindTools(tools);
+const model = createLLM().bindTools(tools);
 
 // =========================
 // 3. Define Graph Routing Logic
@@ -105,11 +90,11 @@ async function callModel(state: typeof MessagesAnnotation.State) {
       - Never assume document contents.
       - Always search first for document-related questions.
 
-      2. duckduckgo_search
+      2. tavily_search_results_json
       Purpose:
-      Searches the live web for external or current information.
+      Searches the live web for external or current information using Tavily.
 
-      Use duckduckgo_search when:
+      Use tavily_search_results_json when:
       - information may be recent or time-sensitive
       - answering requires external knowledge
       - the answer is uncertain or unavailable in conversation context

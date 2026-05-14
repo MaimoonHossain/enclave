@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, FileText, Loader2, ArrowUp } from 'lucide-react';
+import { Plus, X, FileText, Loader2, ArrowUp, Square } from 'lucide-react';
 import { RefObject } from 'react';
 
 interface ChatInputProps {
@@ -16,6 +16,7 @@ interface ChatInputProps {
   uploadMessage: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
   handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  stop: () => void;
 }
 
 export function ChatInput({
@@ -30,6 +31,7 @@ export function ChatInput({
   uploadMessage,
   fileInputRef,
   handleFileChange,
+  stop,
 }: ChatInputProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-[#09090b] via-[#09090b]/95 to-transparent pt-10 pb-6 px-4 md:px-0">
@@ -105,15 +107,20 @@ export function ChatInput({
           />
 
           <button
-            type="submit"
-            disabled={!query.trim() || isTyping}
+            type={isTyping ? "button" : "submit"}
+            onClick={isTyping ? stop : undefined}
+            disabled={!query.trim() && !isTyping}
             className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full mr-1 transition-all ${
-              !query.trim() || isTyping 
+              !query.trim() && !isTyping 
                 ? 'bg-neutral-800 text-neutral-500' 
                 : 'bg-white text-black hover:bg-neutral-200 hover:scale-105 active:scale-95'
             }`}
           >
-            <ArrowUp className="w-5 h-5" strokeWidth={2.5} />
+            {isTyping ? (
+              <Square className="w-4 h-4 fill-current" />
+            ) : (
+              <ArrowUp className="w-5 h-5" strokeWidth={2.5} />
+            )}
           </button>
         </form>
         <div className="text-center mt-3">
