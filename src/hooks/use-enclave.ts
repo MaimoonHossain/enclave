@@ -111,7 +111,7 @@ export function useEnclave() {
 // =========================
 // Convert SDK Messages
 // =========================
-const chatHistory: Message[] = messages.map((message, index) => {
+const chatHistory: Message[] = messages.map((message: any, index) => {
   const isLastMessage = index === messages.length - 1;
   let activeSources: string[] | undefined = sourcesMap[message.id];
 
@@ -119,24 +119,51 @@ const chatHistory: Message[] = messages.map((message, index) => {
     activeSources = latestSourcesRef.current || undefined;
   }
 
-  // Extract Tool Invocations from message parts (AI SDK v6 pattern)
-  // We use a combination of message.toolInvocations (v4/v5 compat) and parts (v6)
+  // Extract Tool Invocations from message parts (AI SDK v6 / DataStream pattern)
   const toolCalls = [
     ...(message.toolInvocations || []),
     ...(message.parts
-      ?.filter((part: any) => part.type === 'tool-invocation')
-      .map((part: any) => part.toolInvocation) || [])
+      ?.filter((part: any) => 
+        part.type === 'tool-invocation' || 
+        part.type === 'dynamic-tool' || 
+        part.type.startsWith('tool-')
+      )
+      .map((part: any) => {
+        if (part.type === 'tool-invocation') return part.toolInvocation;
+        const toolName = part.toolName || part.type.replace(/^tool-/, '');
+        const isDone = part.state === 'output-available' || part.state === 'result';
+        return {
+          toolCallId: part.toolCallId,
+          toolName: toolName,
+          state: isDone ? 'result' : 'call',
+          args: part.input,
+          result: part.output,
+        };
+      }) || [])
   ];
 
-  // Deduplicate by toolCallId
+  // Deduplicate by toolName to prevent multiple duplicate badges when the same tool is called in a loop.
+  // The unified state is 'call' (active) if any invocation of this tool is still active, otherwise 'result' (done).
   const uniqueToolCalls = Array.from(
-    new Map(toolCalls.map(tc => [tc.toolCallId, tc])).values()
+    new Map(
+      toolCalls.map((tc) => {
+        const matchingCalls = toolCalls.filter((t) => t.toolName === tc.toolName);
+        const isAnyActive = matchingCalls.some((t) => t.state === 'call');
+        return [
+          tc.toolName,
+          {
+            ...tc,
+            state: isAnyActive ? 'call' : 'result',
+          },
+        ];
+      })
+    ).values()
   );
 
   return {
     id: message.id,
     role: message.role === 'user' ? 'user' : 'ai',
-    content: message.parts?.map((part: any) => (part.type === 'text' ? part.text : '')).join('') || '',
+    content: message.parts?.map((part: any) => (part.type === 'text' ? part.text : '')).join('') || message.content || '',
     sources: activeSources,
     toolInvocations: uniqueToolCalls
   };

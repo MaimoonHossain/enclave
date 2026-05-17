@@ -14,8 +14,11 @@ export async function POST(request: Request) {
     const index = pinecone.index(process.env.PINECONE_INDEX_NAME!);
 
     // Tell Pinecone to delete all vectors where the "source" metadata matches the filename
-    // Note: We use the default namespace ('') unless you specified one during upload
-    await index.namespace('').deleteMany({ source: filename });
+    // We use the configured namespace to isolate dev/prod environments correctly
+    const namespace = process.env.PINECONE_NAMESPACE || '';
+    await index.namespace(namespace).deleteMany({
+      source: { $eq: filename }
+    });
 
     return NextResponse.json({ 
       success: true, 

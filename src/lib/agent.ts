@@ -67,8 +67,8 @@ function shouldContinue(state: typeof MessagesAnnotation.State) {
 }
 
 // This function calls the LLM with the system prompt and current state
-async function callModel(state: typeof MessagesAnnotation.State) {
-  const response = await model.invoke([
+async function callModel(state: typeof MessagesAnnotation.State, config: any) {
+  const stream = await model.stream([
     {
       role: "system",
       content: `
@@ -109,8 +109,18 @@ async function callModel(state: typeof MessagesAnnotation.State) {
       `
     },
     ...state.messages
-  ]);
-  return { messages: [response] };
+  ], config);
+
+  let finalMessage: any = null;
+  for await (const chunk of stream) {
+    if (!finalMessage) {
+      finalMessage = chunk;
+    } else {
+      finalMessage = finalMessage.concat(chunk);
+    }
+  }
+
+  return { messages: [finalMessage] };
 }
 
 // =========================

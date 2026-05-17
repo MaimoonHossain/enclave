@@ -87,7 +87,7 @@ export function ChatInput({
         {/* Input Bar */}
         <form 
           onSubmit={handleChat} 
-          className="flex items-end gap-2 bg-neutral-900/50 backdrop-blur-xl border border-white/10 rounded-[28px] p-2 focus-within:ring-1 focus-within:ring-white/20 transition-all shadow-lg"
+          className="flex items-end gap-2 bg-neutral-900/50 backdrop-blur-xl border border-white/10 rounded-[28px] p-2 pt-1 focus-within:ring-1 focus-within:ring-white/20 transition-all shadow-lg"
         >
           <button
             type="button"

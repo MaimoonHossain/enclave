@@ -43,7 +43,7 @@ export function MessageList({
                 className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.role === 'ai' && (
-                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800 border border-white/10 mt-1">
+                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-neutral-800 border border-white/10">
                     <Cpu className="w-4 h-4 text-neutral-300" />
                   </div>
                 )}
@@ -64,18 +64,18 @@ export function MessageList({
                             key={toolCallId}
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-500 ${
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-300 select-none ${
                               isDone 
-                                ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-500/80' 
-                                : 'bg-blue-500/5 border-blue-500/10 text-blue-400 animate-pulse'
+                                ? 'bg-neutral-900/30 border-white/5 text-neutral-400' 
+                                : 'bg-neutral-900/80 border-white/10 text-neutral-200 animate-pulse'
                             }`}
                           >
                             {isVault ? (
-                              <Database className="w-3.5 h-3.5" />
+                              <Database className={`w-3.5 h-3.5 ${isDone ? 'text-neutral-500' : 'text-neutral-300'}`} />
                             ) : isWeb ? (
-                              <Globe className="w-3.5 h-3.5" />
+                              <Globe className={`w-3.5 h-3.5 ${isDone ? 'text-neutral-500' : 'text-neutral-300'}`} />
                             ) : (
-                              <Cpu className="w-3.5 h-3.5" />
+                              <Cpu className={`w-3.5 h-3.5 ${isDone ? 'text-neutral-500' : 'text-neutral-300'}`} />
                             )}
                             <span className="tracking-tight">
                               {isVault ? 'Searching Vault' : isWeb ? 'Searching Web' : `Running ${toolName}`}
@@ -85,9 +85,9 @@ export function MessageList({
                               <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
-                                className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500/20"
+                                className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-white/5"
                               >
-                                <Check className="w-2.5 h-2.5" />
+                                <Check className="w-2.5 h-2.5 text-neutral-400" />
                               </motion.div>
                             )}
                           </motion.div>
@@ -97,10 +97,10 @@ export function MessageList({
                   )}
 
                   <div 
-                    className={`px-5 py-3.5 text-[15px] leading-relaxed shadow-sm ${
+                    className={`text-[15px] leading-relaxed ${
                       msg.role === 'user' 
-                        ? 'bg-neutral-200 text-neutral-900 rounded-2xl rounded-tr-sm font-medium' 
-                        : 'text-neutral-300 prose prose-invert prose-p:leading-relaxed prose-pre:bg-neutral-800 prose-pre:border prose-pre:border-neutral-700 max-w-none'
+                        ? 'px-5 py-3.5 shadow-sm bg-neutral-200 text-neutral-900 rounded-2xl rounded-tr-sm font-medium' 
+                        : 'px-0 pt-1 pb-1 text-neutral-300 prose prose-invert prose-p:leading-relaxed prose-p:first:mt-0 prose-p:last:mb-0 prose-p:my-1.5 prose-pre:bg-neutral-800 prose-pre:border prose-pre:border-neutral-700 max-w-none'
                     }`}
                   >
                     {msg.role === 'ai' ? (
