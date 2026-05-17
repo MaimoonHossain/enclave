@@ -37,7 +37,7 @@ const vaultSearchTool = tool(
 // Tool B: The Live Web (Tavily)
 const webSearchTool = new TavilySearch({
   maxResults: 3,
-  tavilyApiKey: process.env.TAVILY_API_KEY,
+  tavilyApiKey: process.env.TAVILY_API_KEY || "dummy-key-for-build",
 });
 
 const tools = [vaultSearchTool, webSearchTool];
