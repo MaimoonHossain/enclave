@@ -16,7 +16,8 @@ export function MessageList({
   chatHistory,
   isTyping,
   messagesEndRef,
-}: MessageListProps) {
+  children,
+}: MessageListProps & { children?: React.ReactNode }) {
   return (
     <main className="flex-1 overflow-y-auto px-4 md:px-0">
       <div className="max-w-3xl mx-auto py-10 pb-32">
@@ -30,7 +31,8 @@ export function MessageList({
               <Cpu className="w-8 h-8 text-neutral-400" />
             </div>
             <h2 className="text-2xl font-medium tracking-tight text-white mb-2">How can I help you today?</h2>
-            <p className="text-neutral-500 max-w-sm">Upload documents to your secure local vault, then ask me anything about them.</p>
+            <p className="text-neutral-500 max-w-sm mb-6">Upload documents to your secure local vault, then ask me anything about them.</p>
+            {children}
           </motion.div>
         ) : (
           <div className="space-y-8">

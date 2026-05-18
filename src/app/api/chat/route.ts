@@ -41,7 +41,7 @@ async function* streamWithTimeout(stream: AsyncGenerator<any>, timeoutMs: number
 export async function POST(request: Request) {
   try {
     // 1. Parse the incoming request from the frontend
-    const { messages } = await request.json();
+    const { messages, searchMode = 'default' } = await request.json();
 
     // 2. Map Vercel UI messages to the strict format expected by LangChain
     // We removed the broken CoreMessage type and map it natively
@@ -55,7 +55,11 @@ export async function POST(request: Request) {
     // 3. Kick off the autonomous Agent workflow
     const rawEventStream = await enclaveAgent.streamEvents(
       { messages: mappedMessages },
-      { version: 'v2', signal: request.signal }
+      { 
+        version: 'v2', 
+        signal: request.signal,
+        configurable: { searchMode }
+      }
     );
 
     // 4. Wrap with a 45s timeout to send a friendly message if the model hangs
