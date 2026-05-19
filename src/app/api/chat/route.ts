@@ -41,7 +41,7 @@ async function* streamWithTimeout(stream: AsyncGenerator<any>, timeoutMs: number
 export async function POST(request: Request) {
   try {
     // 1. Parse the incoming request from the frontend
-    const { messages } = await request.json();
+    const { messages, searchMode = 'default' } = await request.json();
 
     // 2. Map Vercel UI messages to the strict format expected by LangChain
     // We removed the broken CoreMessage type and map it natively

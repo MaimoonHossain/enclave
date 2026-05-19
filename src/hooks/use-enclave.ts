@@ -11,6 +11,16 @@ export function useEnclave() {
   const [query, setQuery] = useState('');
 
   // =========================
+  // Search Mode State
+  // =========================
+  const [searchMode, setSearchMode] = useState<'web' | 'vault' | 'default'>('default');
+  const searchModeRef = useRef(searchMode);
+
+  useEffect(() => {
+    searchModeRef.current = searchMode;
+  }, [searchMode]);
+
+  // =========================
   // Vault State
   // =========================
   const [file, setFile] = useState<File | null>(null);
@@ -47,6 +57,15 @@ export function useEnclave() {
       api: '/api/chat',
       // Extract the custom header when the stream first connects
       fetch: async (input, init) => {
+        if (init && init.body) {
+          try {
+            const bodyObj = JSON.parse(init.body as string);
+            bodyObj.searchMode = searchModeRef.current;
+            init.body = JSON.stringify(bodyObj);
+          } catch (e) {
+            console.error('Failed to append searchMode to request body:', e);
+          }
+        }
         const response = await fetch(input, init);
         const sourcesHeader = response.headers.get('X-Enclave-Sources');
         if (sourcesHeader) {
@@ -306,5 +325,7 @@ const chatHistory: Message[] = messages.map((message: any, index) => {
     handleFileChange,
     handleDeleteFile,
     stop,
+    searchMode,
+    setSearchMode,
   };
 }
