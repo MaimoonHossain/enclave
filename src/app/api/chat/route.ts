@@ -52,9 +52,18 @@ export async function POST(request: Request) {
         : (m.content || ''),
     }));
 
+    // Optimize Context Window (Sliding History)
+    // We keep only the last 6 messages (3 full turns) to prevent input token accumulation.
+    const MAX_HISTORY_LENGTH = 6;
+    const optimizedMessages = mappedMessages.length > MAX_HISTORY_LENGTH
+      ? mappedMessages.slice(-MAX_HISTORY_LENGTH)
+      : mappedMessages;
+
+    console.log(`[Token Optimization] Incoming messages from UI: ${mappedMessages.length} ➡️ Sent to Gemini: ${optimizedMessages.length}`);
+
     // 3. Kick off the autonomous Agent workflow
     const rawEventStream = await enclaveAgent.streamEvents(
-      { messages: mappedMessages },
+      { messages: optimizedMessages },
       { version: 'v2', signal: request.signal }
     );
 

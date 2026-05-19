@@ -18,12 +18,14 @@ const vaultSearchTool = tool(
       pineconeIndex: index,
       namespace: process.env.PINECONE_NAMESPACE || "",
     });
-    const results = await vectorStore.similaritySearch(query, 3);
+    // Optimize: Retrieve 2 highly relevant chunks instead of 3 to save tokens
+    const results = await vectorStore.similaritySearch(query, 2);
     
     if (results.length === 0) {
       return "No relevant documents found in the vault.";
     }
-    return results.map(r => r.pageContent).join("\n\n---\n\n");
+    // Optimize: Safe truncate each chunk's page content to 1200 characters to prevent prompt hijacking or bloat
+    return results.map(r => r.pageContent.slice(0, 1200)).join("\n\n---\n\n");
   },
   {
     name: "vault_search",
@@ -36,7 +38,7 @@ const vaultSearchTool = tool(
 
 // Tool B: The Live Web (Tavily)
 const webSearchTool = new TavilySearch({
-  maxResults: 3,
+  maxResults: 2, // Optimize: Retrieve 2 web search results instead of 3 to reduce context length
   tavilyApiKey: process.env.TAVILY_API_KEY || "dummy-key-for-build",
 });
 
