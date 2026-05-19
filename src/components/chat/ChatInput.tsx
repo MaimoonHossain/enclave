@@ -65,6 +65,15 @@ export function ChatInput({
     };
   }, []);
 
+  // Manage suggestion list visibility based on searchMode and query typing
+  useEffect(() => {
+    if (searchMode === 'web' && query.trim() === '') {
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  }, [searchMode, query]);
+
   return (
     <div className={
       isCentered 
@@ -212,7 +221,7 @@ export function ChatInput({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
-              if (searchMode === 'web') {
+              if (searchMode === 'web' && query.trim() === '') {
                 setShowSuggestions(true);
               }
             }}
